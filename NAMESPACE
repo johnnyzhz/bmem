@@ -1,0 +1,11 @@
+export(bmem.moments,bmem.list.cov,bmem.pair.cov,bmem.sem,
+bmem.sobel,bmem.sobel.ind,bmem.list,bmem.pair,bmem.mi.cov,
+bmem.v,bmem.mi,bmem.pattern,bmem.ssq,bmem.em.cov,bmem.em.rcov,
+bmem.em,bmem.list.jack,bmem.pair.jack,bmem.mi.jack,bmem.em.jack,
+bmem.list.boot,bmem.pair.boot,bmem.mi.boot,bmem.em.boot,
+bmem.ci.p,bmem.ci.norm,bmem.ci.bc,bmem.ci.bc1,bmem.ci.bca,bmem.ci.bca1,
+bmem,bmem.bs,summary.bmem,bmem.raw2cov,bmem.plot,plot.bmem,bmem.cov)
+S3method(summary, bmem)
+S3method(plot, bmem)
+
+
