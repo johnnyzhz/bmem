@@ -36,7 +36,5 @@ The on-screen output includes the parameter estimates, bootstrap standard errors
 Zhiyong Zhang and Lijuan Wang
 }
 \references{
-Zhang, Z. & Wang, L. (2012) Four methods for mediation analysis with missing data. Psychometrika.
-
-Zhang, Z. (2012) Robust mediation analysis with missing data and auxiliary variables.
+Zhang, Z., & Wang, L. (2013). Methods for mediation analysis with missing data. Psychometrika, 78(1), 154-184.
 }

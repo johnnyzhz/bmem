@@ -4,8 +4,28 @@ bmem.v,bmem.mi,bmem.pattern,bmem.ssq,bmem.em.cov,bmem.em.rcov,
 bmem.em,bmem.list.jack,bmem.pair.jack,bmem.mi.jack,bmem.em.jack,
 bmem.list.boot,bmem.pair.boot,bmem.mi.boot,bmem.em.boot,
 bmem.ci.p,bmem.ci.norm,bmem.ci.bc,bmem.ci.bc1,bmem.ci.bca,bmem.ci.bca1,
-bmem,bmem.bs,summary.bmem,bmem.raw2cov,bmem.plot,plot.bmem,bmem.cov)
+bmem,bmem.bs,summary.bmem,bmem.raw2cov,bmem.plot,plot.bmem,bmem.cov, power.basic, power.boot, power.curve, popPar)
 S3method(summary, bmem)
+S3method(summary, power)
 S3method(plot, bmem)
+
+import(
+  MASS, Amelia, snowfall
+)
+
+importFrom("sem", "sem")
+
+importFrom("lavaan", "cfa")
+importFrom("lavaan", "lavaanNames")
+importFrom("lavaan", "parTable")
+importFrom("lavaan", "simulateData")
+importFrom("lavaan", "bootstrapLavaan")
+importFrom("lavaan", "lavInspect")
+
+importFrom("grDevices", "dev.new")
+importFrom("graphics", "hist", "lines", "par", "plot")
+importFrom("stats", "complete.cases", "cov", "density",
+           "deriv", "na.omit", "pchisq", "pnorm", "qchisq", "qnorm",
+           "quantile", "sd", "coef")
 
 
