@@ -586,7 +586,7 @@ bmem.list.boot<-function(x, ram, boot=1000, ...){
     }
   }
   colnames(boot.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')	
-  list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable) ##"0"??ָԭ???ݵĽ???
+  list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable) 
 }
 
 bmem.pair.boot<-function(x, ram, boot=1000, ...){
@@ -1179,7 +1179,7 @@ summary.bmem <- function(object, boot.cl=TRUE, estimates=TRUE,...){
       name <- substr(name, 1, 13)
       
       if(!standardized) {
-        if(is.na(se[i])) { ##??ȱʧ
+        if(is.na(se[i])) { ##
           txt <- sprintf("    %-13s %9.3f %8.3f\n", name, est[i], se[i])
         } else if(se[i] == 0) {
           txt <- sprintf("    %-13s %9.3f\n", name, est[i])
@@ -1218,7 +1218,7 @@ summary.bmem <- function(object, boot.cl=TRUE, estimates=TRUE,...){
           MAX.L <- max(nchar(LABELS))
           NAMES <- abbreviate(NAMES, minlength = (13 - MAX.L), strict = TRUE) ##name the items
           NAMES <- sprintf(paste("%-", (13 - MAX.L), "s%", MAX.L, "s", sep=""), NAMES, LABELS)
-          ## ??????ʽ: "ME        (a)"  "HE        (b)"  "ME       (cp)"
+          
         } else {
           NAMES <- abbreviate(NAMES, minlength = 13, strict = TRUE)
         }
