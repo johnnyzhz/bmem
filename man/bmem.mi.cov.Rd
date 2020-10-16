@@ -8,11 +8,10 @@ Covariance estimation for multiple imputation
 Covariance estimation for multiple imputation
 }
 \usage{
-bmem.mi.cov(x, m = 10, moment = FALSE)
+bmem.mi.cov(x, m = 10)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{A data set}
   \item{m}{Number of imputations}
-  \item{moment}{Estimate mean or not}
 }

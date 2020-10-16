@@ -8,11 +8,10 @@ Covariance matrix from EM
 Covariance matrix from EM
 }
 \usage{
-bmem.em.cov(xmis, moment = FALSE, max_it = 500)
+bmem.em.cov(xmis, max_it = 500)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{xmis}{An object from output of \code{\link{bmem.pattern}}.}
-  \item{moment}{Whether estimating mean}
   \item{max_it}{Maximum number of iterations}
 }

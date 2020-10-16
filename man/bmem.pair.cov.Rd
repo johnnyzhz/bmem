@@ -4,10 +4,9 @@
 \title{Covariance matrix estimation based on pairwise deletion}
 \description{Covariance matrix estimation based on pairwise deletion}
 \usage{
-bmem.pair.cov(x, moment = FALSE)
+bmem.pair.cov(x)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{A data set}
-  \item{moment}{Estimate mean or not}
 }

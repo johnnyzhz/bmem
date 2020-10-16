@@ -8,13 +8,12 @@ Bootstrap but using the Bollen-Stine method
 The same as \code{\link{bmem}} but using the Bollen-Stine method
 }
 \usage{
-bmem.bs(x, ram, indirect, v, ci='bc', cl=.95, 
+bmem.bs(x, ram, v, ci='bc', cl=.95, 
         boot=1000, max_it=500, ...)
 }
 \arguments{
   \item{x}{A data set}
   \item{ram}{RAM path for the mediaiton model}
-  \item{indirect}{A vector of indirect effec}
   \item{v}{Indices of variables used in the mediation model. If omitted, all variables are used.}
   \item{ci}{\code{norm}: normal approximation CI, \code{perc}: percentile CI, \code{bc}: bias-corrected CI, \code{bca}: BCa}
   \item{cl}{Confidence level. Can be a vector.}

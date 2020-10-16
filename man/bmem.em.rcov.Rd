@@ -8,12 +8,11 @@ Estimation of robust covariance matrix
 Estimation of robust covariance matrix
 }
 \usage{
-bmem.em.rcov(xmis, varphi=.1, moment=FALSE, max_it=1000, st='i')
+bmem.em.rcov(xmis, varphi=.1, max_it=1000, st='i')
 }
 \arguments{
   \item{xmis}{Missing data pattern}
   \item{varphi}{Percent of data to be downweighted}
-  \item{moment}{Moment analysis if TRUE}
   \item{max_it}{Maximum number of iteration}
   \item{st}{Starting values}
 }
