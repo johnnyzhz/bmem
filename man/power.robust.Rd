@@ -1,17 +1,15 @@
-\name{power.boot}
-\alias{power.boot}
+\name{power.robust}
+\alias{power.robust}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Conducting power analysis based on bootstrap
+Conducting power analysis based on robust Huber-type standard error
 }
 \description{
-Different from \code{\link{power.basic}}, this function conduct power analysis based on the bootstrap method.
+Different from \code{\link{power.basic}}, this function conduct power analysis based on a robust method.
 }
 \usage{
-power.boot(model, indirect = NULL, nobs, nrep = 1000, nboot = 1000, 
-alpha = 0.95, skewness = NULL, kurtosis = NULL, ovnames = NULL,  
-ci='default', boot.type='default', 
-se = "default", estimator = "default", parallel = "no", 
+power.robust(model, indirect = NULL, nobs, nrep = 1000, 
+alpha = 0.95, skewness = NULL, kurtosis = NULL, ovnames = NULL, parallel = "no", 
 ncore = 1,  ...)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -41,7 +39,6 @@ Number of observations for power analysis. If it is a vector, multiple group ana
   \item{nrep}{
 Number of replications for Monte Carlo simulation. At least 1,000 is recommended.
 }
-\item{nboot}{Number of bootstraps to conduct.}
   \item{alpha}{
 The alpha level is used to obtain the confidence interval for model parameters.
 }
@@ -54,20 +51,12 @@ A vector to give the kurtosis for the observed variables.
   \item{ovnames}{
 A vector to give the variable names for the observed variables. This is only needed when the skewness and kurtosis are provided. The skewness, kurtosis and variable names should be in the same order.
 }
-  \item{se}{
-How to calculate the standard error, for example, robust standard error can be specified using se="robust".
-}
-  \item{estimator}{
-Estimation methods to be used here.
-}
   \item{parallel}{
 Parallel methods, snow or multicore, can be used here. 
 }
   \item{ncore}{
-Number of cores to be used in parallel.
+Number of cores to be used in parallel. By defautl, the maximum number of cores are used.
 }
-\item{ci}{Type of bootstrap confidence intervals. By default, the percentile one is used. To get the bias-corrected one, use ci='BC'}
-\item{boot.type}{Type of bootstrap method. By default, the nonparametric one is used. Changing it to "BS" to use the Bollen-Stine method.}
   \item{\dots}{
 Other named arguments for lavaan can be passed here.
 }
@@ -92,10 +81,10 @@ indirect<-'ab:=a*b'
 
 N<-50
 
-system.time(boot.non.normal<-power.boot(ex1model, indirect, N, 
- nrep=2000, nboot=10000, parallel='multicore', skewness=c(-.3, -.7, 1.3), 
+system.time(robust.non.normal<-power.robust(ex1model, indirect, N, 
+ nrep=2000, parallel='multicore', skewness=c(-.3, -.7, 1.3), 
  kurtosis=c(1.5, 0, 5), ovnames=c('ME', 'HE', 'math'), ncore=8, ci='percent', 
- boot.type='simple'))
-summary(boot.non.normal)
+ robust.type='simple'))
+summary(robust.non.normal)
 }
 }

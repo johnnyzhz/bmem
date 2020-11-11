@@ -1,3 +1,31 @@
+# package depended: lavaan, Amelia, parallel, snowfall
+
+
+bmem.moments<-function(x, type=0){ ##rest 
+  #0: listwise deletion
+  #1: pairwise deletion
+  x<-cbind(1, x)
+  n<-nrow(x)
+  p<-ncol(x)
+  res<-matrix(NA, p, p)	
+  x<-as.matrix(x)
+  if (type ==0){
+    x<-na.omit(x)
+    res<-crossprod(x,x)/n 
+  }else{
+    for (i in 1:p) res[i,i]<-mean( (x[complete.cases(x[,i]),i])^2 )
+    for (i in 1:(p-1)){
+      for (j in (i+1):p){
+        y<-x[,c(i,j)]
+        y<-na.omit(y)
+        res[i,j]<-res[j,i]<-mean(y[,1]*y[,2])
+      }
+    }
+  }
+  rownames(res)<-colnames(res)<-c('(i)', (colnames(x))[2:p]) 
+  res[1,1]<-1
+  res
+}
 
 bmem.list.cov<-function(x){
   ## x: data
@@ -16,15 +44,15 @@ bmem.pair.cov<-function(x){
 
 bmem.sem<-function(x, ram, N, ...){
   ##x:cov matrix, ram:model
-
+  
   sem.res<-lavaan::sem(model = ram,sample.cov = x,sample.nobs = N, ...)
   
-  lavpartable <- partable(sem.res)
+  lavpartable <- lavaan::partable(sem.res)
   
   model.est<-NA
-  model.est<-lavaan::parameterEstimates(sem.res) ##一个dataframe,列分别是:
+  model.est<-lavaan::parameterEstimates(sem.res) ##a dataframe, columns:
   ##lhs,op,rhs,label,est,se,z,pvalue,ci.lower,ci.upper
-  label <- model.est$label               ##把没命名的参数写上名字
+  label <- model.est$label               ##name parameters
   lhs <- model.est$lhs
   op <- model.est$op
   rhs <- model.est$rhs
@@ -33,21 +61,54 @@ bmem.sem<-function(x, ram, N, ...){
       label[i] <- paste(lhs[i],op[i],rhs[i],collapse = " ")
     }
   }
-  est <- model.est$est                  ##est是数值向量,数值为对应名字的参数估计值
+  est <- model.est$est                  ##est is a vector of evaluation of parameters
   names(est) <- label
-  model.sta<-lavaan::fitMeasures(sem.res)       ##model.sta是数值向量，数值为对应名字的统计指标的值
+  model.sta<-lavaan::fitMeasures(sem.res)       ##model.sta a vector of statistics
   model.fit<-c(model.sta["chisq"],model.sta["gfi"], model.sta["agfi"], model.sta["rmsea"], model.sta["nfi"], model.sta["nnfi"], model.sta["cfi"], model.sta["bic"], model.sta["srmr"])
   
   list(est=est,model.fit=model.fit,lavpartable=lavpartable) 
 }
 
+bmem.sobel.ind<-function(sem.object, ind){ ##rest
+  est<-sem.object$coeff
+  temp<-gsub(' +','',ind)	
+  temp<-gsub('-','+', temp, fixed=TRUE)
+  temp<-unlist(strsplit(temp, '+', fixed=TRUE))
+  m<-length(temp)
+  temp.est<-0
+  par<-NULL
+  for (j in 1:m){
+    temp1<-unlist(strsplit(temp[j], '*', fixed=TRUE))
+    par<-c(par, temp1)
+  }
+  ind.exp<-parse(text=ind)
+  par.list<-as.list(est[par])	
+  est.indirect<-eval(ind.exp, par.list)
+  ind.deriv<-deriv(ind.exp, par)
+  first.deriv<-eval(ind.deriv, par.list)
+  first.deriv<-attributes(first.deriv)$gradient
+  
+  if (is.null(sem.object$cov)) {
+    var.par<-sem.object$vcov[par,par]
+  }else{
+    var.par<-sem.object$cov[par,par]
+  }
+  var.ind<-first.deriv%*%var.par%*%t(first.deriv)
+  s.e.ind<-sqrt(var.ind)
+  
+  res<-matrix(c(est.indirect, s.e.ind, est.indirect/s.e.ind), 1, 3)
+  colnames(res)<-c('Estimate', 'S.E.', 'z-score')
+  rownames(res)<-ind
+  res
+}
+
 bmem.sobel<-function(x, ram,  ...){
   N<-nrow(x)
-  temp.cov<-bmem.list.cov(x, moment)
+  temp.cov<-bmem.list.cov(x)
   sem.object<-lavaan::sem(model = ram,sample.cov = temp.cov,sample.nobs = N,...)
-
+  
   all.res <- summary(sem.object)$PE
-
+  
   invisible(list(estimates=all.res))
 }
 
@@ -510,90 +571,205 @@ bmem.em.jack<-function(x, ram, v, robust=FALSE, varphi=.1, st='i', max_it=500, .
   list(jack.est=jack.est, jack.fit=jack.fit,lavpartable=jack.temp$lavpartable)
 }
 
-bmem.list.boot<-function(x, ram, boot=1000, ...){	
+bmem.list.boot<-function(x, ram, boot=1000, parallel=FALSE,ncore = 1,...){	
   # x:data, ram:model
   model0<-bmem.list(x, ram, ...)
   par0<-model0$est
   fit0<-model0$model.fit
   n<-dim(x)[1]
-  boot.est<-NULL
-  boot.fit<-NULL
-  for (i in 1:boot){
+  
+  myfun <- function(i){
     x.boot<-x[sample(n,n, replace=TRUE),]
-    options(warn =-1)  ##hide all warnings
-    modelb<-try(bmem.list(x.boot, ram, ...),silent=TRUE) ##silent=TRUE
+    options(warn =-1)  ## hide all warnings
+    modelb<-try(bmem.list(x.boot, ram, ...),silent=TRUE) ## silent=TRUE
     if (class(modelb)!="try-error"){
-      boot.est<-rbind(boot.est, modelb$est)
-      boot.fit<-rbind(boot.fit, modelb$model.fit)
+      return(list(est=modelb$est,fit=modelb$model.fit))  ## use result[[i]]$est,result[[i]]$fit to get the ith result  
     }
   }
+  old_options <- options(); options(warn = -1)
+  if(parallel){ ## needs package "snowfall" and "parallel"
+    snowfall::sfInit(parallel = TRUE, cpus = ncore)# detectCores() - 1)
+    snowfall::sfLibrary("lavaan", character.only = TRUE)
+    sfExport("bmem.list","bmem.list.cov","bmem.sem")
+    
+    result <- snowfall::sfLapply(1:boot, myfun) 
+    sfStop()
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:length(result)) {
+      boot.est<-rbind(boot.est, result[[i]]$est)
+      boot.fit<-rbind(boot.fit, result[[i]]$fit)
+    }
+  }else{
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:boot){
+      x.boot<-x[sample(n,n, replace=TRUE),]
+      options(warn =-1)  ##hide all warnings
+      modelb<-try(bmem.list(x.boot, ram, ...),silent=TRUE) ##silent=TRUE
+      if (class(modelb)!="try-error"){
+        boot.est<-rbind(boot.est, modelb$est)
+        boot.fit<-rbind(boot.fit, modelb$model.fit)
+      }
+    }
+  }
+  options(old_options)
   colnames(boot.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')	
-  list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable) ##"0"是指原数据的结果
+  list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable) ##"0" is the result of original data
 }
 
-bmem.pair.boot<-function(x, ram, boot=1000, ...){
+bmem.pair.boot<-function(x, ram, boot=1000, parallel=FALSE,ncore = 1,...){
   model0<-bmem.pair(x, ram, ...)
   par0<-model0$est
   fit0<-model0$model.fit
   n<-dim(x)[1]
-  boot.est<-NULL
-  boot.fit<-NULL
-  for (i in 1:boot){
-    x.boot<-x[sample(n, n, replace=TRUE),]
-    options(warn =-1)
-    modelb<-try(bmem.pair(x.boot, ram, ...),silent=TRUE)
+  
+  myfun <- function(i){
+    x.boot<-x[sample(n,n, replace=TRUE),]
+    options(warn =-1)  ## hide all warnings
+    modelb<-try(bmem.pair(x.boot, ram, ...),silent=TRUE) ## silent=TRUE
     if (class(modelb)!="try-error"){
-      boot.est<-rbind(boot.est, modelb$est)
-      boot.fit<-rbind(boot.fit, modelb$model.fit)
+      return(list(est=modelb$est,fit=modelb$model.fit))  ## use result[[i]]$est,result[[i]]$fit to get the ith result  
     }
   }
+  old_options <- options(); options(warn = -1)
+  if(parallel){ ## needs package "snowfall" and "parallel"
+    snowfall::sfInit(parallel = TRUE, cpus = ncore)# detectCores() - 1)
+    snowfall::sfLibrary("lavaan", character.only = TRUE)
+    sfExport("bmem.pair","bmem.pair.cov","bmem.sem")
+    
+    result <- snowfall::sfLapply(1:boot, myfun) 
+    sfStop()
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:length(result)) {
+      boot.est<-rbind(boot.est, result[[i]]$est)
+      boot.fit<-rbind(boot.fit, result[[i]]$fit)
+    }
+  }else{
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:boot){
+      x.boot<-x[sample(n,n, replace=TRUE),]
+      options(warn =-1)  ##hide all warnings
+      modelb<-try(bmem.pair(x.boot, ram, ...),silent=TRUE) ##silent=TRUE
+      if (class(modelb)!="try-error"){
+        boot.est<-rbind(boot.est, modelb$est)
+        boot.fit<-rbind(boot.fit, modelb$model.fit)
+      }
+    }
+  }
+  options(old_options)
+  
   colnames(boot.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')	
   list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0,lavpartable=model0$lavpartable)
 }
 
-bmem.mi.boot<-function(x, ram, v, m=10, boot=1000, ...){
+bmem.mi.boot<-function(x, ram, v, m=10, boot=1000, parallel=FALSE,ncore = 1,...){
   model0<-bmem.mi(x, ram, v, m, ...)
   par0<-model0$est
   fit0<-model0$model.fit
   n<-dim(x)[1]
-  boot.est<-NULL
-  boot.fit<-NULL
-  for (i in 1:boot){
-    x.boot<-x[sample(n, n, replace=TRUE),]
-    options(warn =-1)
-    modelb<-try(bmem.mi(x.boot, ram, v, m, ...),silent=TRUE)
+  
+  myfun <- function(i){
+    x.boot<-x[sample(n,n, replace=TRUE),]
+    options(warn =-1)  ## hide all warnings
+    modelb<-try(bmem.mi(x.boot, ram, ...),silent=TRUE) ## silent=TRUE
     if (class(modelb)!="try-error"){
-      boot.est<-rbind(boot.est, modelb$est)
-      boot.fit<-rbind(boot.fit, modelb$model.fit)
+      return(list(est=modelb$est,fit=modelb$model.fit))  ## use result[[i]]$est,result[[i]]$fit to get the ith result  
     }
   }
+  old_options <- options(); options(warn = -1)
+  if(parallel){ ## needs package "snowfall" and "parallel"
+    snowfall::sfInit(parallel = TRUE, cpus = ncore)# detectCores() - 1)
+    snowfall::sfLibrary("lavaan", character.only = TRUE)
+    sfExport("bmem.mi","bmem.mi.cov","bmem.sem")
+    
+    result <- snowfall::sfLapply(1:boot, myfun) 
+    sfStop()
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:length(result)) {
+      boot.est<-rbind(boot.est, result[[i]]$est)
+      boot.fit<-rbind(boot.fit, result[[i]]$fit)
+    }
+  }else{
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:boot){
+      x.boot<-x[sample(n,n, replace=TRUE),]
+      options(warn =-1)  ##hide all warnings
+      modelb<-try(bmem.mi(x.boot, ram, ...),silent=TRUE) ##silent=TRUE
+      if (class(modelb)!="try-error"){
+        boot.est<-rbind(boot.est, modelb$est)
+        boot.fit<-rbind(boot.fit, modelb$model.fit)
+      }
+    }
+  }
+  options(old_options)
+  
   colnames(boot.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')		
   list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable)
 }
 
 
-bmem.em.boot<-function(x, ram, v, robust=FALSE, varphi=.1, st='i', boot=1000, max_it=500, ...){
+bmem.em.boot<-function(x, ram, v, robust=FALSE, varphi=.1, st='i', boot=1000, max_it=500, parallel=FALSE,ncore = 1,...){
   model0<-bmem.em(x, ram, v, robust, varphi, st, max_it, ...)
   par0<-model0$est
   fit0<-model0$model.fit
   n<-dim(x)[1]
-  boot.est<-NULL
-  boot.fit<-NULL
-  for (i in 1:boot){
-    x.boot<-x[sample(n, n, replace=TRUE),]
-    options(warn =-1)
-    modelb<-try(bmem.em(x.boot, ram, v, robust, varphi, st, max_it, ...),silent=TRUE)
+  
+  myfun <- function(i){
+    x.boot<-x[sample(n,n, replace=TRUE),]
+    options(warn =-1)  ## hide all warnings
+    modelb<-try(bmem.em(x.boot, ram, ...),silent=TRUE) ## silent=TRUE
     if (class(modelb)!="try-error"){
-      boot.est<-rbind(boot.est, modelb$est)
-      boot.fit<-rbind(boot.fit, modelb$model.fit)
+      return(list(est=modelb$est,fit=modelb$model.fit))  ## use result[[i]]$est,result[[i]]$fit to get the ith result  
     }
   }
+  old_options <- options(); options(warn = -1)
+  if(parallel){ ## needs package "snowfall" and "parallel"
+    snowfall::sfInit(parallel = TRUE, cpus = ncore)# detectCores() - 1)
+    snowfall::sfLibrary("lavaan", character.only = TRUE)
+    sfExport("bmem.em","bmem.em.cov","bmem.sem")
+    
+    result <- snowfall::sfLapply(1:boot, myfun) 
+    sfStop()
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:length(result)) {
+      boot.est<-rbind(boot.est, result[[i]]$est)
+      boot.fit<-rbind(boot.fit, result[[i]]$fit)
+    }
+  }else{
+    
+    boot.est<-NULL
+    boot.fit<-NULL
+    for (i in 1:boot){
+      x.boot<-x[sample(n,n, replace=TRUE),]
+      options(warn =-1)  ##hide all warnings
+      modelb<-try(bmem.em(x.boot, ram, ...),silent=TRUE) ##silent=TRUE
+      if (class(modelb)!="try-error"){
+        boot.est<-rbind(boot.est, modelb$est)
+        boot.fit<-rbind(boot.fit, modelb$model.fit)
+      }
+    }
+  }
+  options(old_options)
+  
   colnames(boot.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')	
   list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable)
 }
 
 ## bootstrap confidence intervals
-bmem.ci.p<-function(par.boot, par0, cl=.95){##不需要改动
+bmem.ci.p<-function(par.boot, par0, cl=.95){
   alpha<-(1-cl)/2
   alpha<-c(alpha, 1-alpha)
   alpha<-sort(alpha)
@@ -687,18 +863,18 @@ bmem.ci.bca<-function(par.boot, par0, jack, cl=.95){
 
 
 ### A main function for analysis
-bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varphi=.1, st='i', robust=FALSE, max_it=500, moment=FALSE, ...){
-  ## x:data, ram:model
+bmem<-function(data, model, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varphi=.1, st='i', robust=FALSE, max_it=500, parallel=FALSE, ncore=1, ...){
+  ## data:data, model:model
   ## method: list, pair, mi, tsml
   ## ci: norm, perc, bc, bca
-  N<-nrow(x)
-  P<-ncol(x)
+  N<-nrow(data)
+  P<-ncol(data)
   if (missing(v)) v<-1:P
   
   ## for listwise deletion method
   if (method=='list'){
-    x<-x[,v]
-    boot.est<-bmem.list.boot(x, ram, boot, ...)
+    data<-data[,v]
+    boot.est<-bmem.list.boot(data, model, boot, parallel, ncore, ...)
     if (ci=='norm'){
       ci.est<-bmem.ci.norm(boot.est$par.boot, boot.est$par0, cl)
       ci.fit<-bmem.ci.norm(boot.est$boot.fit, boot.est$fit0, cl)
@@ -712,7 +888,7 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
       ci.fit<-bmem.ci.bc(boot.est$boot.fit, boot.est$fit0, cl)
     }
     if (ci=='bca'){
-      jack.est<-bmem.list.jack(x,ram, ...)
+      jack.est<-bmem.list.jack(data,model, ...)
       ci.est<-bmem.ci.bca(boot.est$par.boot, boot.est$par0, jack.est$jack.est, cl)
       ci.fit<-bmem.ci.bca(boot.est$boot.fit, boot.est$fit0, jack.est$jack.fit, cl)
     }
@@ -720,8 +896,8 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
   
   ## for pairwise deletion method
   if (method=='pair'){
-    x<-x[,v]
-    boot.est<-bmem.pair.boot(x, ram, boot, ...)
+    data<-data[,v]
+    boot.est<-bmem.pair.boot(data, model, boot, parallel, ncore,...)
     if (ci=='norm'){
       ci.est<-bmem.ci.norm(boot.est$par.boot, boot.est$par0, cl)
       ci.fit<-bmem.ci.norm(boot.est$boot.fit, boot.est$fit0, cl)
@@ -735,7 +911,7 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
       ci.fit<-bmem.ci.bc(boot.est$boot.fit, boot.est$fit0, cl)
     }
     if (ci=='bca'){
-      jack.est<-bmem.pair.jack(x,ram, ...)
+      jack.est<-bmem.pair.jack(data,model, ...)
       ci.est<-bmem.ci.bca(boot.est$par.boot, boot.est$par0, jack.est$jack.est, cl)
       ci.fit<-bmem.ci.bca(boot.est$boot.fit, boot.est$fit0, jack.est$jack.fit, cl)
     }
@@ -743,7 +919,7 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
   
   ## for multiple imputation method
   if (method=='mi'){
-    boot.est<-bmem.mi.boot(x,ram,v,m,boot,...)
+    boot.est<-bmem.mi.boot(data,model,v,m,boot,parallel, ncore,...)
     if (ci=='norm'){
       ci.est<-bmem.ci.norm(boot.est$par.boot, boot.est$par0, cl)
       ci.fit<-bmem.ci.norm(boot.est$boot.fit, boot.est$fit0, cl)
@@ -757,7 +933,7 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
       ci.fit<-bmem.ci.bc(boot.est$boot.fit, boot.est$fit0, cl)
     }
     if (ci=='bca'){
-      jack.est<-bmem.mi.jack(x,ram,v,m,...)
+      jack.est<-bmem.mi.jack(data,model,v,m,...)
       ci.est<-bmem.ci.bca(boot.est$par.boot, boot.est$par0, jack.est$jack.est, cl)
       ci.fit<-bmem.ci.bca(boot.est$boot.fit, boot.est$fit0, jack.est$jack.fit, cl)
     }
@@ -765,7 +941,7 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
   
   ## for EM method
   if (method=='tsml'){
-    boot.est<-bmem.em.boot(x,ram, v, robust, varphi, st, boot, max_it, ...)
+    boot.est<-bmem.em.boot(data,model, v, robust, varphi, st, boot, max_it, parallel, ncore,...)
     if (ci=='norm'){
       ci.est<-bmem.ci.norm(boot.est$par.boot, boot.est$par0, cl)
       ci.fit<-bmem.ci.norm(boot.est$boot.fit, boot.est$fit0, cl)
@@ -779,7 +955,7 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
       ci.fit<-bmem.ci.bc(boot.est$boot.fit, boot.est$fit0, cl)
     }
     if (ci=='bca'){
-      jack.est<-bmem.em.jack(x,ram, v, robust, varphi, st, max_it, ...)
+      jack.est<-bmem.em.jack(data,model, v, robust, varphi, st, max_it, ...)
       ci.est<-bmem.ci.bca(boot.est$par.boot, boot.est$par0, jack.est$jack.est, cl)
       ci.fit<-bmem.ci.bca(boot.est$boot.fit, boot.est$fit0, jack.est$jack.fit, cl)
     }
@@ -792,48 +968,19 @@ bmem<-function(x, ram, v, method='tsml', ci='bc', cl=.95, boot=1000, m=10, varph
   print(ci.fit)
   cat('\nThe literature has suggested the use of Bollen-Stine bootstrap for model fit. To do so, use the function bmem.bs().\n')
   
-  lavpartable <- boot.est$lavpartable[,c(2:4,7,10,11,14,15)]##要写的
+  lavpartable <- boot.est$lavpartable[,c(2:4,7,10,11,14,15)]## to be written
   lavpartable[,"est"] <- ci.est[,"estimate"]
   lavpartable[,"se"] <- ci.est[,"se.boot"]
   
+  infor <- list(samplesize=N,method=method,boot=boot,sucboot=nrow(boot.est$par.boot),ci=ci)
+  
   if (ci=='bca') {
-    bmemobject<-list(ci=ci.est, ci.fit=ci.fit, boot.est=boot.est, jack.est=jack.est, lavpartable=lavpartable)
+    bmemobject<-list(ci=ci.est, ci.fit=ci.fit, boot.est=boot.est, jack.est=jack.est, lavpartable=lavpartable,infor=infor)
   }else{
-    bmemobject<-list(ci=ci.est, ci.fit=ci.fit, boot.est=boot.est, lavpartable=lavpartable)
+    bmemobject<-list(ci=ci.est, ci.fit=ci.fit, boot.est=boot.est, lavpartable=lavpartable,infor=infor)
   }
   class(bmemobject)<-'bmem'
   invisible(bmemobject)
-}
-
-summary.bmem<-function(object, ci='bc', cl=.95, ...){
-  boot.est<-object$boot.est
-  if (ci=='norm'){
-    ci.est<-bmem.ci.norm(boot.est$par.boot, boot.est$par0, cl)
-    ci.fit<-bmem.ci.norm(boot.est$boot.fit, boot.est$fit0, cl)
-  }
-  if (ci=='perc'){ 
-    ci.est<-bmem.ci.p(boot.est$par.boot, boot.est$par0, cl)
-    ci.fit<-bmem.ci.p(boot.est$boot.fit, boot.est$fit0, cl)
-  }
-  if (ci=='bc'){ 
-    ci.est<-bmem.ci.bc(boot.est$par.boot, boot.est$par0, cl)
-    ci.fit<-bmem.ci.bc(boot.est$boot.fit, boot.est$fit0, cl)
-  }
-  if (ci=='bca'){
-    jack.est<-object$jack.est
-    ci.est<-bmem.ci.bca(boot.est$par.boot, boot.est$par0, jack.est$jack.est, cl)
-    ci.fit<-bmem.ci.bca(boot.est$boot.fit, boot.est$fit0, jack.est$jack.fit, cl)
-  }
-  
-  cat('The bootstrap confidence intervals for parameter estimates\n')
-  print(ci.est)
-  
-  cat('\nThe bootstrap confidence intervals for model fit indices\n')
-  rownames(ci.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')
-  print(ci.fit)
-  allci<-list(ci.est=ci.est, ci.fit=ci.fit)
-  class(allci)<-'summary.bmem'
-  invisible(allci)
 }
 
 bmem.raw2cov<-function(x){
@@ -846,9 +993,8 @@ bmem.raw2cov<-function(x){
 
 bmem.bs<-function(x, ram, v, ci='bc', cl=.95, boot=1000, max_it=500, ...){
   ## Estimate the saturated mean and covariance matrix
-  moment<-TRUE
   xmiss<-bmem.pattern(x)
-  s.cov<-bmem.em.cov(xmiss, moment=TRUE, max_it)
+  s.cov<-bmem.em.cov(xmiss, max_it)
   
   ## Estimate the model indicated covariance matrix
   N<-nrow(x)
@@ -895,7 +1041,7 @@ bmem.bs<-function(x, ram, v, ci='bc', cl=.95, boot=1000, max_it=500, ...){
   P<-ncol(x)
   if (missing(v)) v<-1:P
   ##boot.est<-bmem.em.boot(x,ram,indirect,v,boot,moment,max_it, ...)
-  boot.est<-bmem.em.boot(x,ram,v,boot,moment,max_it, ...)
+  boot.est<-bmem.em.boot(x,ram,v,boot,max_it, ...)
   if (ci=='norm'){
     ci.est<-bmem.ci.norm(boot.est$par.boot, boot.est$par0, cl)
     ci.fit<-bmem.ci.norm(boot.est$boot.fit, boot.est$fit0, cl)
@@ -909,7 +1055,7 @@ bmem.bs<-function(x, ram, v, ci='bc', cl=.95, boot=1000, max_it=500, ...){
     ci.fit<-bmem.ci.bc(boot.est$boot.fit, boot.est$fit0, cl)
   }
   if (ci=='bca'){
-    jack.est<-bmem.em.jack(x,ram,indirect,v,moment,max_it, ...)
+    jack.est<-bmem.em.jack(x,ram,v,max_it, ...)
     ci.est<-bmem.ci.bca(boot.est$par.boot, boot.est$par0, jack.est$jack.est, cl)
     ci.fit<-bmem.ci.bca(boot.est$boot.fit, boot.est$fit0, jack.est$jack.fit, cl)
   }
@@ -1068,9 +1214,10 @@ bmem.cov <- function(ram,obs.variables, debug=FALSE){
 }
 
 
-summary.bmem.ver2 <- function(object, boot.cl=TRUE, estimates=TRUE){
+summary.bmem <- function(object, boot.cl=TRUE, estimates=TRUE,...){
   par <- object$ci     ##list: (par), estimate, se.boot, 2.5%, 97.5%
   fit <- object$ci.fit ##list: (sta), estimate, se.boot, 2.5%, 97.5%
+  infor <- object$infor ##list: samplesize, method, boot, sucboot, ci
   lci <- par[,"2.5%"]
   rci <- par[,"97.5%"]
   npar <- nrow(par)
@@ -1080,6 +1227,30 @@ summary.bmem.ver2 <- function(object, boot.cl=TRUE, estimates=TRUE){
   lavpartable <- object$lavpartable
   est <- lavpartable$est   ##lavpartable:id,lhs,op,rhs,user,block,group,free,ustart,exo,label,plabel,start,est,se
   se  <- lavpartable$se
+  
+  cat("\n")
+  t0.txt <- sprintf("Estimate method:                          ")
+  t1.txt <- sprintf("%s",infor$method)
+  cat(t0.txt,t1.txt, "\n", sep="")
+  
+  t0.txt <- sprintf("Sample size:                              ")
+  t1.txt <- sprintf("%-10.d",infor$samplesize)
+  cat(t0.txt,t1.txt, "\n", sep="")
+  
+  t0.txt <- sprintf("Number of request bootstrap draws:        ")
+  t1.txt <- sprintf("%-10.d",infor$boot)
+  cat(t0.txt,t1.txt, "\n", sep="")
+  
+  t0.txt <- sprintf("Number of successful bootstrap draws:     ")
+  t1.txt <- sprintf("%-10.d",infor$sucboot)
+  cat(t0.txt,t1.txt, "\n", sep="")
+  
+  t0.txt <- sprintf("Type of confidence interval:              ")
+  t1.txt <- sprintf("%s",infor$ci)
+  cat(t0.txt,t1.txt, "\n", sep="")
+  
+  cat("\n")
+  
   
   if(boot.cl==FALSE){
     
@@ -1109,7 +1280,7 @@ summary.bmem.ver2 <- function(object, boot.cl=TRUE, estimates=TRUE){
   if(boot.cl==TRUE){
     
     lpro <- colnames(par)[3]
-    rpro <- colnames(par)[4]  ##置信水平
+    rpro <- colnames(par)[4]  ##confidence level 
     t0.txt <- sprintf("confidence level: %s ", rpro)
     cat(t0.txt, "\n", sep="")
     cat("\n")
@@ -1122,37 +1293,46 @@ summary.bmem.ver2 <- function(object, boot.cl=TRUE, estimates=TRUE){
     for (i in 1:npar) {
       t0.txt <- sprintf("  %-20s", parname[i])  
       t1.txt <- sprintf("  %-20.3f", par[i,1])
-      t2.txt <- sprintf("  (%.3f, %.3f)", par[i,3],par[i,4]) ##写到这里
-      cat(t0.txt, t1.txt, t2.txt, "\n", sep="")
-    }
-    
-    cat("\n")
-    
-    t0.txt <- sprintf("  %-20s", "Statistics")
-    t1.txt <- sprintf("  %-20s", "Estimate")
-    t2.txt <- sprintf("  %s", "boot.cl")
-    cat(t0.txt, t1.txt, t2.txt, "\n", sep="")
-    
-    for (i in 1:nfit) {
-      t0.txt <- sprintf("  %-20s", staname[i])  
-      t1.txt <- sprintf("  %-20.3f", fit[i,1])
-      t2.txt <- sprintf("  (%.3f, %.3f)", fit[i,3],fit[i,4])
+      t2.txt <- sprintf("  (%.3f, %.3f)", par[i,3],par[i,4]) ##stop here
       cat(t0.txt, t1.txt, t2.txt, "\n", sep="")
     }
   }
   
   cat("\n")
+  t0.txt <- sprintf("Values of statistics:")
+  cat(t0.txt, "\n", sep="")
+  cat("\n")
+  
+  cat("                     Value      SE      ")
+  cat(lpro)
+  cat("     ")
+  cat(rpro)
+  cat("\n")
+  for (i in 1:nfit) {
+    t0.txt <- sprintf("  %-20s", staname[i])  
+    t1.txt <- sprintf("%-8.3f", fit[i,1])
+    t2.txt <- sprintf(" %-8.3f", fit[i,2])
+    t3.txt <- sprintf(" %-8.3f", fit[i,3])
+    t4.txt <- sprintf(" %-8.3f", fit[i,4])
+    cat(t0.txt, t1.txt, t2.txt, t3.txt, t4.txt, "\n", sep="")
+  }
+  cat("\n")
+  
   standardized <- 0
   
   if(estimates) {       
+    t0.txt <- sprintf("Estimation of parameters:")
+    cat(t0.txt, "\n", sep="")
+    cat("\n")
+    
     # local print function
-    print.estimate <- function(name="ERROR", i=1, z.stat=TRUE) { ##name是makename函数的输出结果
+    print.estimate <- function(name="ERROR", i=1, z.stat=TRUE) { ##name is the output of function makename
       
       # cut name if (still) too long
       name <- substr(name, 1, 13)
       
       if(!standardized) {
-        if(is.na(se[i])) { ##若缺失
+        if(is.na(se[i])) { ##??缺失
           txt <- sprintf("    %-13s %9.3f %8.3f\n", name, est[i], se[i])
         } else if(se[i] == 0) {
           txt <- sprintf("    %-13s %9.3f\n", name, est[i])
@@ -1184,14 +1364,14 @@ summary.bmem.ver2 <- function(object, boot.cl=TRUE, estimates=TRUE){
       
       makeNames <- function(NAMES, LABELS) {
         # labels?
-        l.idx <- which(nchar(LABELS) > 0L)   ##选出有label的
+        l.idx <- which(nchar(LABELS) > 0L)   ##select items with labels
         if(length(l.idx) > 0L) {
-          LABELS <- abbreviate(LABELS, 4)    ##对应项以其名字命名
-          LABELS[l.idx] <- paste(" (", LABELS[l.idx], ")", sep="") ##加个括号
+          LABELS <- abbreviate(LABELS, 4)    ##name the items
+          LABELS[l.idx] <- paste(" (", LABELS[l.idx], ")", sep="") ##add a "(" ")"
           MAX.L <- max(nchar(LABELS))
-          NAMES <- abbreviate(NAMES, minlength = (13 - MAX.L), strict = TRUE) ##对应项以其名字命名
+          NAMES <- abbreviate(NAMES, minlength = (13 - MAX.L), strict = TRUE) ##name the items
           NAMES <- sprintf(paste("%-", (13 - MAX.L), "s%", MAX.L, "s", sep=""), NAMES, LABELS)
-          ## 输出样式: "ME        (a)"  "HE        (b)"  "ME       (cp)"
+          ## ??????式: "ME        (a)"  "HE        (b)"  "ME       (cp)"
         } else {
           NAMES <- abbreviate(NAMES, minlength = 13, strict = TRUE)
         }
@@ -1352,3 +1532,4 @@ summary.bmem.ver2 <- function(object, boot.cl=TRUE, estimates=TRUE){
   } # "if(estimates)" end
   
 } 
+

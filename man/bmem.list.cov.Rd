@@ -8,10 +8,9 @@ Covariance matrix for listwise deletion
 Covariance matrix for listwise deletion
 }
 \usage{
-bmem.list.cov(x, moment = FALSE)
+bmem.list.cov(x)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{A data set}
-  \item{moment}{Estimate mean or not}
 }

@@ -432,7 +432,7 @@ power.basic<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skew
 	return(object)
 }
 
-power.robust<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skewness=NULL, kurtosis=NULL, ovnames=NULL, se="robust.huber.white", estimator="MLR", parallel="no", ncore=1, ...){
+power.robust<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skewness=NULL, kurtosis=NULL, ovnames=NULL, parallel="no", ncore=1, ...){
   if (missing(model)) stop("A model is needed.")
   se="robust.huber.white"; estimator="MLR"
   model.indirect<-paste(model, "\n", indirect, "\n")
@@ -556,7 +556,7 @@ power.boot<-function(model, indirect=NULL, nobs=100, nrep=1000, nboot=1000, alph
 	
 	## internal function
 	coef.new<-function(x,...){
-		coef(x, type='user', ...) ## CHANGE!!!
+		lavaan::coef(x, type='user', ...) ## CHANGE!!!
 	}
 	model.indirect<-paste(model, "\n", indirect, "\n")
 	ngroups <- length(nobs)

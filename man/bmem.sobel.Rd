@@ -8,13 +8,11 @@ Mediation analysis using sobel test (for complete data only)
 Mediation analysis using sobel test (for complete data only)
 }
 \usage{
-bmem.sobel(x, ram, indirect, moment=FALSE, ...)
+bmem.sobel(x, ram,  ...)
 }
 \arguments{
   \item{x}{A data set}
   \item{ram}{RAM path for the mediaiton model}
-  \item{indirect}{A vector of indirect effec}
-  \item{moment}{Covariance or moment analysis}
   \item{\dots}{Other options for \code{\link{sem}} function can be used.}
 }
 

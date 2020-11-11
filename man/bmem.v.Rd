@@ -8,11 +8,10 @@ Select data according to a vector of indices
 Select data according to a vector of indices
 }
 \usage{
-bmem.v(x, v, moment = FALSE)
+bmem.v(x, v)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{A matrix}
   \item{v}{A vector of indices}
-  \item{moment}{Covariane analysis or mean and covariance analysis}
 }
