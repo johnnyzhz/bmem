@@ -10,8 +10,7 @@ Bootstrap for EM
 \usage{
 bmem.em.boot(x, ram, v, robust = FALSE, 
              varphi = 0.1, st= "i", boot = 1000, 
-             max_it = 500, ...)
-
+             max_it = 500, parallel=FALSE, ncore=1,...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -23,6 +22,8 @@ bmem.em.boot(x, ram, v, robust = FALSE,
   \item{st}{Starting values}
   \item{boot}{Number of bootstraps. Default is 1000.}
   \item{max_it}{Maximum number of iterations in EM}
+  \item{parallel}{Whether to use parallel method to calculate.}
+  \item{ncore}{Numbers of core for parallel method.}
   \item{\dots}{Other options for \code{\link{sem}} function can be used.}
 }
 \details{

@@ -556,7 +556,7 @@ power.boot<-function(model, indirect=NULL, nobs=100, nrep=1000, nboot=1000, alph
 	
 	## internal function
 	coef.new<-function(x,...){
-		coef(x, type='user', ...) ## CHANGE!!!
+		lavaan::coef(x, type='user', ...) ## CHANGE!!!
 	}
 	model.indirect<-paste(model, "\n", indirect, "\n")
 	ngroups <- length(nobs)

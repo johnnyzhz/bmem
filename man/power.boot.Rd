@@ -64,7 +64,7 @@ Estimation methods to be used here.
 Parallel methods, snow or multicore, can be used here. 
 }
   \item{ncore}{
-Number of cores to be used in parallel. By defautl, the maximum number of cores are used.
+Number of cores to be used in parallel.
 }
 \item{ci}{Type of bootstrap confidence intervals. By default, the percentile one is used. To get the bias-corrected one, use ci='BC'}
 \item{boot.type}{Type of bootstrap method. By default, the nonparametric one is used. Changing it to "BS" to use the Bollen-Stine method.}
