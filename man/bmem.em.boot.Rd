@@ -11,7 +11,6 @@ Bootstrap for EM
 bmem.em.boot(x, ram, v, robust = FALSE, 
              varphi = 0.1, st= "i", boot = 1000, 
              max_it = 500, parallel=FALSE, ncore=1,...)
-
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{

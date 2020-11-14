@@ -1,6 +1,5 @@
 # package depended: lavaan, Amelia, parallel, snowfall
 
-
 bmem.moments<-function(x, type=0){ ##rest 
   #0: listwise deletion
   #1: pairwise deletion
@@ -87,7 +86,7 @@ bmem.sobel.ind<-function(sem.object, ind){ ##rest
   ind.deriv<-deriv(ind.exp, par)
   first.deriv<-eval(ind.deriv, par.list)
   first.deriv<-attributes(first.deriv)$gradient
-  
+
   if (is.null(sem.object$cov)) {
     var.par<-sem.object$vcov[par,par]
   }else{
@@ -95,12 +94,13 @@ bmem.sobel.ind<-function(sem.object, ind){ ##rest
   }
   var.ind<-first.deriv%*%var.par%*%t(first.deriv)
   s.e.ind<-sqrt(var.ind)
-  
+
   res<-matrix(c(est.indirect, s.e.ind, est.indirect/s.e.ind), 1, 3)
   colnames(res)<-c('Estimate', 'S.E.', 'z-score')
   rownames(res)<-ind
   res
 }
+
 
 bmem.sobel<-function(x, ram,  ...){
   N<-nrow(x)
@@ -617,7 +617,9 @@ bmem.list.boot<-function(x, ram, boot=1000, parallel=FALSE,ncore = 1,...){
   }
   options(old_options)
   colnames(boot.fit)<-c('chisq', 'GFI','AGFI', 'RMSEA','NFI','NNFI','CFI','BIC','SRMR')	
+
   list(par.boot=boot.est, par0=par0, boot.fit=boot.fit, fit0=fit0, lavpartable=model0$lavpartable) ##"0" is the result of original data
+
 }
 
 bmem.pair.boot<-function(x, ram, boot=1000, parallel=FALSE,ncore = 1,...){
@@ -1332,7 +1334,8 @@ summary.bmem <- function(object, boot.cl=TRUE, estimates=TRUE,...){
       name <- substr(name, 1, 13)
       
       if(!standardized) {
-        if(is.na(se[i])) { ##??ȱʧ
+
+        if(is.na(se[i])) { ##
           txt <- sprintf("    %-13s %9.3f %8.3f\n", name, est[i], se[i])
         } else if(se[i] == 0) {
           txt <- sprintf("    %-13s %9.3f\n", name, est[i])
@@ -1371,7 +1374,6 @@ summary.bmem <- function(object, boot.cl=TRUE, estimates=TRUE,...){
           MAX.L <- max(nchar(LABELS))
           NAMES <- abbreviate(NAMES, minlength = (13 - MAX.L), strict = TRUE) ##name the items
           NAMES <- sprintf(paste("%-", (13 - MAX.L), "s%", MAX.L, "s", sep=""), NAMES, LABELS)
-          ## ??????ʽ: "ME        (a)"  "HE        (b)"  "ME       (cp)"
         } else {
           NAMES <- abbreviate(NAMES, minlength = 13, strict = TRUE)
         }
