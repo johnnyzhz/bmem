@@ -5,12 +5,11 @@
 \title{Calculate bootstrap confidence intervals of parameters and values of some statistics}
 \description{Calculate bootstrap confidence intervals of parameters and values of some statistics}
 \usage{
-\method{summary}{bmem}(object, boot.cl=TRUE, estimates=TRUE,...)
+\method{summary}{bmem}(object, estimates=TRUE,...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{object}{An output object from the function \code{\link{bmem}}}
-  \item{boot.cl}{Whether output the bootstrap comfidence intervals of parameters}
   \item{estimates}{Whether output a more detailed results of parameters and values of statistics}
   \item{...}{other options can be used for the generic summary function.}
 }

@@ -8,7 +8,7 @@ Generate a power curve
 Generate a power curve either based on Sobel test or bootstrap
 }
 \usage{
-power.curve(model, indirect=NULL, nobs=100, type='basic', nrep=1000, 
+power.curve(model, nobs=100, type='basic', nrep=1000, 
 nboot=1000, alpha=.95, skewness=NULL, kurtosis=NULL, ovnames=NULL,  
 ci='default', boot.type='default', 
 se="default", estimator="default", parallel="no", 
@@ -21,17 +21,12 @@ A model specified using lavaan notation and above. See \code{\link{model.syntax}
 
 For the power analysis, the population parameter values should be provided in the following way. For example, the coefficient between math and HE is .39. Then it is specified as start(.39). If the parameter will be referred in the mediation effect, a label should be given as a modifier as b*HE+start(.39)*HE.
 
+It also specify the indirect or other composite effects  using lavaan notation.
+
 model<-'
 math ~ c*ME+start(0)*ME + b*HE+start(.39)*HE
 HE ~ a*ME+start(.39)*ME
-'
-
-}
-  \item{indirect}{
-The indirect or other composite effects are specified in the following way
-
-indirect<-'
-ab: = a*b
+ab := a*b
 abc := a*b + c
 '
 }
