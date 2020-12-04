@@ -8,7 +8,7 @@ Conducting power analysis based on Sobel test
 Different from \code{\link{power.boot}}, this function conduct power analysis based on the Sobel test.
 }
 \usage{
-power.basic(model, indirect = NULL, nobs, nrep = 1000, alpha = 0.95, 
+power.basic(model, nobs, nrep = 1000, alpha = 0.95, 
 skewness = NULL, kurtosis = NULL, ovnames = NULL, se = "default", 
 estimator = "default", parallel = "no", ncore = 1,  ...)
 }
@@ -19,20 +19,17 @@ A model specified using lavaan notation and above. See \code{\link{model.syntax}
 
 For the power analysis, the population parameter values should be provided in the following way. For example, the coefficient between math and HE is .39. Then it is specified as start(.39). If the parameter will be referred in the mediation effect, a label should be given as a modifier as b*HE+start(.39)*HE.
 
+It also specify the indirect or other composite effects  using lavaan notation.
+
 model<-'
 math ~ c*ME+start(0)*ME + b*HE+start(.39)*HE
 HE ~ a*ME+start(.39)*ME
-'
-
-}
-  \item{indirect}{
-The indirect or other composite effects are specified in the following way
-
-indirect<-'
-ab: = a*b
+ab := a*b
 abc := a*b + c
 '
+
 }
+
   \item{nobs}{
 Number of observations for power analysis. If it is a vector, multiple group analysis will be conducted.
 }
