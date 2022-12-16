@@ -2,16 +2,20 @@
 ## by Zhiyong Zhang
 summary.power<-function(object, ...) {
 
+    # lavaan slots
+    lavoptions <- lavInspect(object$out, "options")
+    lavtest    <- lavInspect(object$out, "test")
+
     # Show some basic about the simulation methods
 
     # main part: parameter estimates
     cat("Basic information:\n\n")
-	if(object$out@Options$test %in% c("satorra.bentler", "yuan.bentler",
-                                  "mean.var.adjusted",
-                                  "scaled.shifted") &&
-       length(object$out@Fit@test) > 1L) {
+	if(lavoptions$test %in% c("satorra.bentler", "yuan.bentler",
+                              "mean.var.adjusted",
+                              "scaled.shifted") &&
+       length(lavtest) > 1L) {
         scaled <- TRUE
-        if(object$out@Options$test == "scaled.shifted")
+        if(lavoptions$test == "scaled.shifted")
             shifted <- TRUE
         else
             shifted <- FALSE
@@ -21,13 +25,13 @@ summary.power<-function(object, ...) {
     }
 	
 	t0.txt <- sprintf("  %-40s", "Esimation method")
-    t1.txt <- sprintf("  %10s", object$out@Options$estimator)
+    t1.txt <- sprintf("  %10s", lavoptions$estimator)
     t2.txt <- ifelse(scaled, 
               sprintf("  %10s", "Robust"), "")
     cat(t0.txt, t1.txt, t2.txt, "\n", sep="")
 	
 	t0.txt <- sprintf("  %-40s", "Standard error")
-    t1.txt <- sprintf("  %10s", object$out@Options$se)
+    t1.txt <- sprintf("  %10s", lavoptions$se)
 	cat(t0.txt, t1.txt, "\n", sep="")
 	
 	if (!is.null(object$info$bootstrap)){
@@ -63,17 +67,19 @@ summary.power<-function(object, ...) {
 	cvg<-object$coverage
 	
 	object<-object$out
-	
+	ngroups <- lavInspect(object, "ngroups")
+    group.label <- lavInspect(object, "group.label")
+    lavpartable <- parTable(object)
 
-    for(g in 1:object@Data@ngroups) {
-        ov.names <- lavaanNames(object, group=g) #lavaan:::vnames(object@ParTable, "ov", group=g)
-        lv.names <- lavaanNames(object, type='lv', group=g) #lavaan:::vnames(object@ParTable, "lv", group=g)
+    for(g in 1:ngroups) {
+        ov.names <- lavaanNames(object, group = g) 
+        lv.names <- lavaanNames(object, type = "lv", group = g) 
 
         # group header
-        if(object@Data@ngroups > 1) {
+        if(ngroups > 1) {
             if(g > 1) cat("\n\n")
             cat("Group ", g, 
-                " [", object@Data@group.label[[g]], "]:\n\n", sep="")
+                " [", group.label[g], "]:\n\n", sep="")
         }
 
         # estimates header
@@ -113,19 +119,19 @@ summary.power<-function(object, ...) {
             NAMES
         }
 
-        NAMES <- object@ParTable$rhs
+        NAMES <- lavpartable$rhs
 
         # 1a. indicators ("=~") (we do show dummy indicators)
-        mm.idx <- which( object@ParTable$op == "=~" & 
-                        !object@ParTable$lhs %in% ov.names &
-                         object@ParTable$group == g)
+        mm.idx <- which( lavpartable$op == "=~" & 
+                        !lavpartable$lhs %in% ov.names &
+                         lavpartable$group == g)
         if(length(mm.idx)) {
             cat("Latent variables:\n")
             lhs.old <- ""
-            NAMES[mm.idx] <- makeNames(  object@ParTable$rhs[mm.idx],
-                                       object@ParTable$label[mm.idx])
+            NAMES[mm.idx] <- makeNames(  lavpartable$rhs[mm.idx],
+                                         lavpartable$label[mm.idx])
             for(i in mm.idx) {
-                lhs <- object@ParTable$lhs[i]
+                lhs <- lavpartable$lhs[i]
                 if(lhs != lhs.old) cat("  ", lhs, " =~\n", sep="")
                 print.estimate(name=NAMES[i], i)
                 lhs.old <- lhs
@@ -134,15 +140,15 @@ summary.power<-function(object, ...) {
         }
 
         # 1b. formative/composites ("<~")
-        fm.idx <- which( object@ParTable$op == "<~" &
-                         object@ParTable$group == g)
+        fm.idx <- which( lavpartable$op == "<~" &
+                         lavpartable$group == g)
         if(length(fm.idx)) {
             cat("Composites:\n")
             lhs.old <- ""
-            NAMES[fm.idx] <- makeNames(  object@ParTable$rhs[fm.idx],
-                                       object@ParTable$label[fm.idx])
+            NAMES[fm.idx] <- makeNames(  lavpartable$rhs[fm.idx],
+                                         lavpartable$label[fm.idx])
             for(i in fm.idx) {
-                lhs <- object@ParTable$lhs[i]
+                lhs <- lavpartable$lhs[i]
                 if(lhs != lhs.old) cat("  ", lhs, " <~\n", sep="")
                 print.estimate(name=NAMES[i], i)
                 lhs.old <- lhs
@@ -151,14 +157,14 @@ summary.power<-function(object, ...) {
         }
 
         # 2. regressions
-        eqs.idx <- which(object@ParTable$op == "~" & object@ParTable$group == g)
+        eqs.idx <- which(lavpartable$op == "~" & lavpartable$group == g)
         if(length(eqs.idx) > 0) {
             cat("Regressions:\n")
             lhs.old <- ""
-            NAMES[eqs.idx] <- makeNames(  object@ParTable$rhs[eqs.idx],
-                                        object@ParTable$label[eqs.idx])
+            NAMES[eqs.idx] <- makeNames(  lavpartable$rhs[eqs.idx],
+                                          lavpartable$label[eqs.idx])
             for(i in eqs.idx) {
-                lhs <- object@ParTable$lhs[i]
+                lhs <- lavpartable$lhs[i]
                 if(lhs != lhs.old) cat("  ", lhs, " ~\n", sep="")
                 print.estimate(name=NAMES[i], i)
                 lhs.old <- lhs
@@ -167,17 +173,17 @@ summary.power<-function(object, ...) {
         }
 
         # 3. covariances
-        cov.idx <- which(object@ParTable$op == "~~" & 
-                         !object@ParTable$exo &
-                         object@ParTable$lhs != object@ParTable$rhs &
-                         object@ParTable$group == g)
+        cov.idx <- which(lavpartable$op == "~~" & 
+                         !lavpartable$exo &
+                         lavpartable$lhs != lavpartable$rhs &
+                         lavpartable$group == g)
         if(length(cov.idx) > 0) {
             cat("Covariances:\n")
             lhs.old <- ""
-            NAMES[cov.idx] <- makeNames(  object@ParTable$rhs[cov.idx],
-                                        object@ParTable$label[cov.idx])
+            NAMES[cov.idx] <- makeNames(  lavpartable$rhs[cov.idx],
+                                          lavpartable$label[cov.idx])
             for(i in cov.idx) {
-                lhs <- object@ParTable$lhs[i]
+                lhs <- lavpartable$lhs[i]
                 if(lhs != lhs.old) cat("  ", lhs, " ~~\n", sep="")
                 print.estimate(name=NAMES[i], i)
                 lhs.old <- lhs
@@ -186,15 +192,15 @@ summary.power<-function(object, ...) {
         }
 
         # 4. intercepts/means
-        ord.names <- lavaanNames(object, type='ov.ord') #lavaan:::vnames(object@ParTable, type="ov.ord", group=g)
-        int.idx <- which(object@ParTable$op == "~1" & 
-                         !object@ParTable$lhs %in% ord.names &
-                         !object@ParTable$exo &
-                         object@ParTable$group == g)
+        ord.names <- lavaanNames(object, type="ov.ord") 
+        int.idx <- which(lavpartable$op == "~1" & 
+                         !lavpartable$lhs %in% ord.names &
+                         !lavpartable$exo &
+                         lavpartable$group == g)
         if(length(int.idx) > 0) {
             cat("Intercepts:\n")
-            NAMES[int.idx] <- makeNames(  object@ParTable$lhs[int.idx],
-                                        object@ParTable$label[int.idx])
+            NAMES[int.idx] <- makeNames(  lavpartable$lhs[int.idx],
+                                          lavpartable$label[int.idx])
             for(i in int.idx) {
                 print.estimate(name=NAMES[i], i)
             }
@@ -202,15 +208,15 @@ summary.power<-function(object, ...) {
         }
 
         # 4b thresholds
-        th.idx <- which(object@ParTable$op == "|" &
-                        object@ParTable$group == g)
+        th.idx <- which(lavpartable$op == "|" &
+                        lavpartable$group == g)
         if(length(th.idx) > 0) {
             cat("Thresholds:\n")
-            NAMES[th.idx] <- makeNames(  paste(object@ParTable$lhs[th.idx],
+            NAMES[th.idx] <- makeNames(  paste(lavpartable$lhs[th.idx],
                                                "|",
-                                               object@ParTable$rhs[th.idx],
+                                               lavpartable$rhs[th.idx],
                                                sep=""),
-                                         object@ParTable$label[th.idx])
+                                               lavpartable$label[th.idx])
             for(i in th.idx) {
                 print.estimate(name=NAMES[i], i)
             }
@@ -218,16 +224,16 @@ summary.power<-function(object, ...) {
         }
 
         # 5. (residual) variances
-        var.idx <- which(object@ParTable$op == "~~" &
-                         !object@ParTable$exo &
-                         object@ParTable$lhs == object@ParTable$rhs &
-                         object@ParTable$group == g)
+        var.idx <- which(lavpartable$op == "~~" &
+                         !lavpartable$exo &
+                         lavpartable$lhs == lavpartable$rhs &
+                         lavpartable$group == g)
         if(length(var.idx) > 0) {
             cat("Variances:\n")
-            NAMES[var.idx] <- makeNames(  object@ParTable$rhs[var.idx],
-                                        object@ParTable$label[var.idx])
+            NAMES[var.idx] <- makeNames(  lavpartable$rhs[var.idx],
+                                          lavpartable$label[var.idx])
             for(i in var.idx) {
-                if(object@Options$mimic == "lavaan") {
+                if(lavoptions$mimic == "lavaan") {
                     print.estimate(name=NAMES[i], i, z.stat=FALSE)
                 } else {
                     print.estimate(name=NAMES[i], i, z.stat=TRUE)
@@ -237,12 +243,12 @@ summary.power<-function(object, ...) {
         }
 
         # 6. latent response scales
-        delta.idx <- which(object@ParTable$op == "~*~" &
-                         object@ParTable$group == g)
+        delta.idx <- which(lavpartable$op == "~*~" &
+                           lavpartable$group == g)
         if(length(delta.idx) > 0) {
             cat("Scales y*:\n")
-            NAMES[delta.idx] <- makeNames(  object@ParTable$rhs[delta.idx],
-                                            object@ParTable$label[delta.idx])
+            NAMES[delta.idx] <- makeNames(  lavpartable$rhs[delta.idx],
+                                            lavpartable$label[delta.idx])
             for(i in delta.idx) {
                 print.estimate(name=NAMES[i], i, z.stat=TRUE)
             }
@@ -252,11 +258,11 @@ summary.power<-function(object, ...) {
     } # ngroups
 
     # 6. variable definitions
-    def.idx <- which(object@ParTable$op == ":=")
+    def.idx <- which(lavpartable$op == ":=")
     if(length(def.idx) > 0) {
-        if(object@Data@ngroups > 1) cat("\n")
+        if(ngroups > 1) cat("\n")
         cat("Indirect/Mediation effects:\n")
-        NAMES[def.idx] <- makeNames(  object@ParTable$lhs[def.idx], "")
+        NAMES[def.idx] <- makeNames(  lavpartable$lhs[def.idx], "")
         for(i in def.idx) {
             print.estimate(name=NAMES[i], i)
         }
@@ -267,11 +273,14 @@ summary.power<-function(object, ...) {
 
 ## bootstrap confidence intervals
 popPar<-function(object){
-	par.value<-object@ParTable$ustart
+
+    lavpartable <- parTable(object)
+
+	par.value<-lavpartable$ustart
 	for (i in 1:length(par.value)){
 		if (is.na(par.value[i])){
-			if (object@ParTable$op[i]=="~~"){
-				if (object@ParTable$rhs[i]==object@ParTable$lhs[i]){
+			if (lavpartable$op[i]=="~~"){
+				if (lavpartable$rhs[i]==lavpartable$lhs[i]){
 					par.value[i]<-1
 				}else{
 					par.value[i]<-0
@@ -281,11 +290,11 @@ popPar<-function(object){
 			}
 		}
 	}
-	names(par.value)<-object@ParTable$label
+	names(par.value)<-lavpartable$label
 	## for indirect effec defined here
 	for (i in 1:length(par.value)){
-		if (object@ParTable$op[i]==":="){
-			temp<-object@ParTable$rhs[i]
+		if (lavpartable$op[i]==":="){
+			temp<-lavpartable$rhs[i]
 			temp<-gsub(' +','',temp)
 			temp<-gsub('-','+', temp, fixed=TRUE)
 			temp<-unlist(strsplit(temp, '+', fixed=TRUE))
@@ -296,7 +305,7 @@ popPar<-function(object){
 				temp1<-unlist(strsplit(temp[j], '*', fixed=TRUE))
 				par<-c(par, temp1)
 			}
-			ind.exp<-parse(text=object@ParTable$rhs[i])
+			ind.exp<-parse(text=lavpartable$rhs[i])
 			par.list<-as.list(par.value[par])
 			par.value[i]<-eval(ind.exp, par.list)
 		}
@@ -322,20 +331,22 @@ power.basic<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skew
 	if (ngroups > 1){
 		error <- 0
 		while (error == 0){
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator, group='group', ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator, group='group', ...))
 			if (class(temp.res)!= "try-error") error <- 1
 		}
 	}else{
 		error <- 0
 		while (error == 0){
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator, ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator, ...))
 			if (class(temp.res)!= "try-error") error <- 1
 		}
 	}
 	par.value<-popPar(temp.res)
-	idx <- 1:length( temp.res@ParTable$lhs )
-	#cnames<-paste(temp.res@ParTable$lhs[idx], temp.res@ParTable$op[idx], temp.res@ParTable$rhs[idx])
-	ov<-lavaanNames(temp.res,type='ov')
+
+    temp.res.lavpartable <- parTable(temp.res)
+	idx <- 1:length( temp.res.lavpartable$lhs )
+	#cnames<-paste(temp.res.lavpartable$lhs[idx], temp.res.lavpartable$op[idx], temp.res.lavpartable$rhs[idx])
+	ov<-lavaanNames(temp.res,type="ov")
 	## dealing with skewness and kurtosis
 	if (length(skewness) > 1){
 		if (length(skewness)!=length(ovnames)) stop("The number of skewness is not equal to the number observed variables")	
@@ -349,7 +360,7 @@ power.basic<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skew
 		kurtosis<-kurtosis[index]
 	}	
 	
-	cnames<-paste(temp.res@ParTable$lhs[idx], temp.res@ParTable$op[idx], temp.res@ParTable$rhs[idx])
+	cnames<-paste(temp.res.lavpartable$lhs[idx], temp.res.lavpartable$op[idx], temp.res.lavpartable$rhs[idx])
 	out<-temp.res
 	runonce<-function(i){
 		## Step 1: generate data
@@ -361,17 +372,18 @@ power.basic<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skew
 	
 		## Step 2: fit the model 		
 		if (ngroups > 1){
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator, group='group',  ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator, group='group',  ...))
 		}else{
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator,  ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator,  ...))
 		}
 		
 		## Step 3: Check significance
 		
 		if (class(temp.res)!="try-error"){
-			idx <- 1:length( temp.res@ParTable$lhs )
-			temp.est<-temp.res@Fit@est[idx]
-			temp.se<-temp.res@Fit@se[idx]
+            temp.res.lavpartable <- parTable(temp.res)
+			idx <- 1:length( temp.res.lavpartable$lhs )
+			temp.est<-temp.res.lavpartable$est[idx]
+			temp.se<-temp.res.lavpartable$se[idx]
 			temp.sig<-temp.est/temp.se
 			crit<-qnorm(1-(1-alpha)/2)
 			temp.sig.ind<-abs(temp.sig)>crit
@@ -397,7 +409,7 @@ power.basic<-function(model, indirect=NULL, nobs=100, nrep=1000, alpha=.95, skew
     RR <- nrep
     res <- if (ncore > 1L && parallel != "no") {
 		sfInit( parallel=TRUE, cpus=ncore )
-		sfLibrary(lavaan)
+		sfLibrary("lavaan", character.only = TRUE)
         sfLapply(seq_len(RR), runonce)
     } else lapply(seq_len(RR), runonce)
 	
@@ -442,21 +454,22 @@ power.boot<-function(model, indirect=NULL, nobs=100, nrep=1000, nboot=1000, alph
 	if (ngroups > 1){
 		error <- 0
 		while (error == 0){
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator, group='group', ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator, group='group', ...))
 			if (class(temp.res)!= "try-error") error <- 1
 		}
 	}else{
 		error <- 0
 		while (error == 0){
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator, ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator, ...))
 			if (class(temp.res)!= "try-error") error <- 1
 		}
 	}
+    temp.res.lavpartable <- parTable(temp.res)
 	par.value<-popPar(temp.res)
-	idx <- 1:length( temp.res@ParTable$lhs )
-	#cnames<-paste(temp.res@ParTable$lhs[idx], temp.res@ParTable$op[idx], temp.res@ParTable$rhs[idx])
-	ov<-lavaanNames(temp.res,type='ov')
-	ptype<-(temp.res@ParTable$op == "~~") & (temp.res@ParTable$lhs == temp.res@ParTable$rhs)
+	idx <- 1:length( temp.res.lavpartable$lhs )
+	#cnames<-paste(temp.res.lavpartable$lhs[idx], temp.res.lavpartable$op[idx], temp.res.lavpartable$rhs[idx])
+	ov<-lavaanNames(temp.res,type="ov")
+	ptype<-(temp.res.lavpartable$op == "~~") & (temp.res.lavpartable$lhs == temp.res.lavpartable$rhs)
 	
 	## dealing with skewness and kurtosis
 	if (length(skewness) > 1){
@@ -521,9 +534,9 @@ power.boot<-function(model, indirect=NULL, nobs=100, nrep=1000, nboot=1000, alph
 		## Step 2: fit the model 		
 		#temp.res<-sem(model.indirect, data=newdata, se=se, estimator=estimator, ...)
 		if (ngroups > 1){
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator, group='group',  ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator, group='group',  ...))
 		}else{
-			temp.res<-try(lavaan::sem(model.indirect, data=newdata, se=se, estimator=estimator,  ...))
+			temp.res<-try(lavaan::cfa(model.indirect, data=newdata, se=se, estimator=estimator,  ...))
 		}
 		
 		
@@ -576,7 +589,7 @@ power.boot<-function(model, indirect=NULL, nobs=100, nrep=1000, nboot=1000, alph
     RR <- nrep
     res <- if (ncore > 1L && parallel != "no") {
 		sfInit( parallel=TRUE, cpus=ncore )
-		sfLibrary(lavaan)
+		sfLibrary("lavaan", character.only = TRUE)
         sfLapply(seq_len(RR), runonce)
     } else lapply(seq_len(RR), runonce)
 	
